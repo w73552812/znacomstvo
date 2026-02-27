@@ -3,138 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TG Dating Mini App</title>
+    <title>TG Dating App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --primary: #fe3c72; /* Цвет Тиндера */
+            --primary: #fe3c72;
             --bg: var(--tg-theme-bg-color, #f5f5f5);
             --text: var(--tg-theme-text-color, #222);
             --hint: var(--tg-theme-hint-color, #999);
+            --card-bg: #fff;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
-        /* Шапка */
-        header { height: 50px; display: flex; align-items: center; justify-content: center; font-weight: bold; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        header { height: 50px; display: flex; align-items: center; justify-content: center; font-weight: bold; border-bottom: 1px solid rgba(0,0,0,0.1); background: var(--card-bg); }
 
-        /* Контент разделов */
         .page { display: none; flex: 1; position: relative; overflow-y: auto; padding: 20px; }
         .page.active { display: flex; flex-direction: column; }
 
-        /* ЛЕНТА И СВАЙПЫ */
+        /* FEED / SWIPES */
         #feed { overflow: hidden; justify-content: center; align-items: center; }
-        .card-container { width: 100%; height: 80vh; position: relative; perspective: 1000px; }
+        .card-container { width: 100%; height: 85%; position: relative; }
         .card { 
             position: absolute; width: 100%; height: 100%; border-radius: 20px; 
-            background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            overflow: hidden; touch-action: none; transform-origin: 50% 100%;
+            background: var(--card-bg); box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            overflow: hidden; touch-action: none; transition: transform 0.1s linear;
         }
         .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
         .card-info { 
-            position: absolute; bottom: 0; left: 0; right: 0; padding: 20px;
-            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); color: white;
+            position: absolute; bottom: 0; left: 0; right: 0; padding: 25px 15px;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); color: white;
         }
 
-        /* ПРОФИЛЬ */
-        .profile-form { display: flex; flex-direction: column; gap: 15px; }
-        .profile-form input, .profile-form textarea, .profile-form select {
-            padding: 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 16px;
+        /* STAMPS */
+        .stamp { 
+            position: absolute; top: 40px; padding: 5px 15px; border: 5px solid; border-radius: 10px; 
+            font-size: 32px; font-weight: bold; opacity: 0; z-index: 10; text-transform: uppercase;
         }
-        .btn-save { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; }
+        .stamp.like { border-color: #4bdf80; color: #4bdf80; right: 30px; transform: rotate(-15deg); }
+        .stamp.nope { border-color: #ff4b4b; color: #ff4b4b; left: 30px; transform: rotate(15deg); }
 
-        /* МЭТЧИ */
-        .match-item { display: flex; align-items: center; gap: 15px; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
-        .match-item img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; }
+        /* PROFILE FORM */
+        .profile-form { display: flex; flex-direction: column; gap: 12px; }
+        .profile-form input, .profile-form textarea {
+            padding: 14px; border-radius: 12px; border: 1px solid #ddd; background: var(--card-bg); color: var(--text); font-size: 16px;
+        }
+        .btn-save { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 12px; font-weight: bold; margin-top: 10px; }
 
-        /* НИЖНЕЕ МЕНЮ */
+        /* NAV */
         nav { 
             height: 70px; background: var(--tg-theme-secondary-bg-color, #fff); 
             display: flex; justify-content: space-around; align-items: center;
             border-top: 1px solid rgba(0,0,0,0.1); padding-bottom: env(safe-area-inset-bottom);
         }
-        .nav-btn { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--hint); cursor: pointer; }
+        .nav-btn { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--hint); transition: 0.2s; }
         .nav-btn.active { color: var(--primary); }
-        .nav-btn span { font-size: 24px; }
+        .nav-icon { font-size: 24px; margin-bottom: 4px; }
 
-        /* Индикаторы лайка */
-        .stamp { 
-            position: absolute; top: 40px; padding: 5px 10px; border: 4px solid; border-radius: 10px; 
-            text-transform: uppercase; font-size: 30px; font-weight: bold; opacity: 0; transform: rotate(-20deg);
-        }
-        .stamp.like { border-color: #4bdf80; color: #4bdf80; right: 40px; }
-        .stamp.nope { border-color: #ff4b4b; color: #ff4b4b; left: 40px; transform: rotate(20deg); }
+        /* NO USERS MESSAGE */
+        .empty-state { text-align: center; color: var(--hint); padding-top: 50px; }
     </style>
 </head>
 <body>
 
-    <header id="header-title">Знакомства</header>
+    <header>ЗНАКОМСТВА</header>
 
     <div id="feed" class="page active">
         <div class="card-container" id="card-stack">
-            <div class="card" id="main-card">
+            <div id="no-users" class="empty-state" style="display: none;">
+                <h2>🥳 Пока всё!</h2>
+                <p>Новые анкеты появятся скоро.</p>
+            </div>
+            <div class="card" id="main-card" style="display: none;">
                 <div class="stamp like">LIKE</div>
                 <div class="stamp nope">NOPE</div>
-                <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500" id="user-photo">
+                <img id="card-img" src="">
                 <div class="card-info">
-                    <h2 id="user-name">Загрузка...</h2>
-                    <p id="user-bio">Ищем людей поблизости</p>
+                    <h2 id="card-name">Загрузка...</h2>
+                    <p id="card-bio">Расстояние: рядом</p>
                 </div>
             </div>
         </div>
     </div>
 
     <div id="matches" class="page">
-        <h3>Ваши симпатии</h3>
-        <div id="matches-list" style="margin-top: 20px;">
-            <p style="color: gray;">Пока никого нет. Свайпайте чаще!</p>
-        </div>
+        <h3>Ваши мэтчи 🔥</h3>
+        <div id="matches-list" style="margin-top: 15px;"></div>
     </div>
 
     <div id="profile" class="page">
         <div class="profile-form">
-            <label>Ваше имя</label>
-            <input type="text" id="form-name" placeholder="Имя">
-            <label>О себе</label>
-            <textarea id="form-bio" placeholder="Расскажите о себе"></textarea>
-            <label>Ссылка на фото (URL)</label>
-            <input type="text" id="form-photo" placeholder="https://...">
-            <button class="btn-save" onclick="saveProfile()">Сохранить профиль</button>
+            <label>Твое имя</label>
+            <input type="text" id="form-name">
+            <label>О тебе</label>
+            <textarea id="form-bio" rows="3"></textarea>
+            <label>Ссылка на фото</label>
+            <input type="text" id="form-photo" placeholder="https://example.com/photo.jpg">
+            <button class="btn-save" onclick="saveProfile()">СОХРАНИТЬ</button>
         </div>
     </div>
 
     <nav>
-        <div class="nav-btn active" onclick="showPage('feed')"><span>🔥</span>Лента</div>
-        <div class="nav-btn" onclick="showPage('matches')"><span>💬</span>Мэтчи</div>
-        <div class="nav-btn" onclick="showPage('profile')"><span>👤</span>Профиль</div>
+        <div class="nav-btn active" onclick="showPage('feed')"><span class="nav-icon">🔥</span>Лента</div>
+        <div class="nav-btn" onclick="showPage('matches')"><span class="nav-icon">💬</span>Мэтчи</div>
+        <div class="nav-btn" onclick="showPage('profile')"><span class="nav-icon">👤</span>Профиль</div>
     </nav>
 
     <script>
-        // --- КОНФИГУРАЦИЯ SUPABASE ---
-        const SUPABASE_URL = 'ТВОЙ_URL_ИЗ_SUPABASE';
-        const SUPABASE_KEY = 'ТВОЙ_ANON_KEY_ИЗ_SUPABASE';
+        // 1. НАСТРОЙКИ (ВСТАВЬ СВОИ ДАННЫЕ)
+        const SUPABASE_URL = 'https://hkytvcxzxvjptyjnfjs.supabase.co'; 
+        const SUPABASE_KEY = 'sb_publishable_Q_5iVnvsom6Pv3oiT4muPg_ZvGURMgw';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         const tg = window.Telegram.WebApp;
-        tg.expand();
-        const userId = tg.initDataUnsafe?.user?.id || 12345; // Для тестов вне ТГ ставим 12345
+        const myId = tg.initDataUnsafe?.user?.id || 12345;
+        let currentCandidate = null;
 
-        // --- ЛОГИКА ПЕРЕКЛЮЧЕНИЯ СТРАНИЦ ---
+        // 2. НАВИГАЦИЯ
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(pageId).classList.add('active');
             event.currentTarget.classList.add('active');
-            
+            if(pageId === 'feed') loadNextUser();
             if(pageId === 'matches') loadMatches();
         }
 
-        // --- ЛОГИКА СВАЙПОВ ---
+        // 3. ЛОГИКА СВАЙПОВ
         const card = document.getElementById('main-card');
-        const likeStamp = card.querySelector('.like');
-        const nopeStamp = card.querySelector('.nope');
         let startX = 0;
 
         card.addEventListener('touchstart', e => {
@@ -144,76 +142,123 @@
 
         card.addEventListener('touchmove', e => {
             let x = e.touches[0].clientX - startX;
-            let deg = x / 10;
+            let deg = x / 15;
             card.style.transform = `translateX(${x}px) rotate(${deg}deg)`;
-            
-            // Показываем штампы лайка/дизлайка
-            if (x > 50) { likeStamp.style.opacity = x / 150; nopeStamp.style.opacity = 0; }
-            else if (x < -50) { nopeStamp.style.opacity = -x / 150; likeStamp.style.opacity = 0; }
-            else { likeStamp.style.opacity = 0; nopeStamp.style.opacity = 0; }
+            card.querySelector('.like').style.opacity = x > 50 ? x/150 : 0;
+            card.querySelector('.nope').style.opacity = x < -50 ? -x/150 : 0;
         });
 
         card.addEventListener('touchend', e => {
             let x = e.changedTouches[0].clientX - startX;
-            if (Math.abs(x) > 120) {
-                let side = x > 0 ? 'right' : 'left';
-                completeSwipe(side);
+            if (Math.abs(x) > 100) {
+                handleSwipe(x > 0 ? 'right' : 'left');
             } else {
-                card.style.transition = 'all 0.3s ease';
+                card.style.transition = '0.3s';
                 card.style.transform = 'translateX(0) rotate(0)';
-                likeStamp.style.opacity = 0;
-                nopeStamp.style.opacity = 0;
+                card.querySelectorAll('.stamp').forEach(s => s.style.opacity = 0);
             }
         });
 
-        function completeSwipe(side) {
-            card.style.transition = 'all 0.5s ease';
-            card.style.transform = `translateX(${side === 'right' ? 500 : -500}px) rotate(${side === 'right' ? 30 : -30}deg)`;
-            card.style.opacity = 0;
-            
-            console.log("Свайп в сторону: " + side);
-            // Тут вызывается запись в Supabase: recordSwipe(side === 'right')
+        async function handleSwipe(side) {
+            card.style.transition = '0.5s';
+            card.style.transform = `translateX(${side === 'right' ? 500 : -500}px) rotate(${side === 'right' ? 20 : -20}deg)`;
+            card.style.opacity = '0';
 
-            setTimeout(() => {
-                // Возврат карточки и смена данных (фейк загрузка следующего)
-                card.style.transition = 'none';
-                card.style.transform = 'translateX(0) rotate(0)';
-                card.style.opacity = 1;
-                likeStamp.style.opacity = 0;
-                nopeStamp.style.opacity = 0;
-                // В реальности тут: loadNextUser()
-            }, 500);
+            // Сохраняем свайп в БД
+            if(currentCandidate) {
+                await supabase.from('swipes').insert({
+                    from_user: myId,
+                    to_user: currentCandidate.tg_id,
+                    is_like: side === 'right'
+                });
+            }
+
+            setTimeout(loadNextUser, 300);
         }
 
-        // --- ФУНКЦИИ БД (SUPABASE) ---
+        // 4. РАБОТА С ДАННЫМИ
+        async function loadNextUser() {
+            // Получаем людей, которых еще не свайпали
+            const { data: swiped } = await supabase.from('swipes').select('to_user').eq('from_user', myId);
+            const excludedIds = swiped.map(s => s.to_user).concat([myId]);
+
+            const { data: users } = await supabase
+                .from('profiles')
+                .select('*')
+                .not('tg_id', 'in', `(${excludedIds.join(',')})`)
+                .limit(1);
+
+            if (users && users.length > 0) {
+                currentCandidate = users[0];
+                document.getElementById('card-img').src = currentCandidate.photo_url;
+                document.getElementById('card-name').innerText = `${currentCandidate.first_name}, ${currentCandidate.age || ''}`;
+                document.getElementById('card-bio').innerText = currentCandidate.bio || '';
+                
+                card.style.display = 'block';
+                card.style.transition = 'none';
+                card.style.transform = 'translateX(0) rotate(0)';
+                card.style.opacity = '1';
+                document.getElementById('no-users').style.display = 'none';
+                card.querySelectorAll('.stamp').forEach(s => s.style.opacity = 0);
+            } else {
+                card.style.display = 'none';
+                document.getElementById('no-users').style.display = 'block';
+            }
+        }
+
         async function saveProfile() {
-            const name = document.getElementById('form-name').value;
-            const bio = document.getElementById('form-bio').value;
-            const photo = document.getElementById('form-photo').value;
+            const profileData = {
+                tg_id: myId,
+                first_name: document.getElementById('form-name').value,
+                bio: document.getElementById('form-bio').value,
+                photo_url: document.getElementById('form-photo').value,
+                username: tg.initDataUnsafe?.user?.username || ''
+            };
 
-            const { error } = await supabase.from('profiles').upsert({
-                tg_id: userId,
-                first_name: name,
-                bio: bio,
-                photo_url: photo
-            });
-
-            if (error) alert('Ошибка сохранения: ' + error.message);
-            else tg.showAlert('Профиль сохранен!');
+            const { error } = await supabase.from('profiles').upsert(profileData);
+            if (error) alert('Ошибка: ' + error.message);
+            else tg.showAlert('Профиль успешно сохранен!');
         }
 
         async function loadMatches() {
-            // Запрос в Supabase для получения мэтчей
-            // Пока заглушка
             const list = document.getElementById('matches-list');
-            list.innerHTML = '<p style="color:gray">Слишком мало данных в БД для поиска мэтчей...</p>';
+            list.innerHTML = 'Загрузка...';
+            
+            // Простая логика поиска мэтчей: кто лайкнул меня, и кого лайкнул я
+            const { data: myLikes } = await supabase.from('swipes').select('to_user').eq('from_user', myId).eq('is_like', true);
+            const myLikedIds = myLikes.map(l => l.to_user);
+
+            const { data: matches } = await supabase
+                .from('swipes')
+                .select('from_user, profiles!swipes_from_user_fkey(*)')
+                .eq('to_user', myId)
+                .eq('is_like', true)
+                .in('from_user', myLikedIds);
+
+            list.innerHTML = '';
+            if (matches && matches.length > 0) {
+                matches.forEach(m => {
+                    const user = m.profiles;
+                    list.innerHTML += `
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px; background:var(--card-bg); padding:10px; border-radius:10px;">
+                            <img src="${user.photo_url}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;">
+                            <div>
+                                <b>${user.first_name}</b><br>
+                                <a href="https://t.me/${user.username}" target="_blank" style="color:var(--primary); text-decoration:none;">Написать</a>
+                            </div>
+                        </div>`;
+                });
+            } else {
+                list.innerHTML = '<p style="color:gray;">Мэтчей пока нет</p>';
+            }
         }
 
-        // Заполняем имя из ТГ при старте
-        if (tg.initDataUnsafe?.user) {
+        // Старт
+        if(tg.initDataUnsafe?.user) {
             document.getElementById('form-name').value = tg.initDataUnsafe.user.first_name;
-            document.getElementById('user-name').innerText = tg.initDataUnsafe.user.first_name + ", 20";
         }
+        loadNextUser();
+        tg.expand();
     </script>
 </body>
 </html>
